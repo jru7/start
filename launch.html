@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <title>Experiment Launcher</title>
 
-  <!-- iOS standalone -->
+  <!-- Enable fullscreen when launched from Home Screen -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-  <!-- Lock zooming -->
+  <!-- Prevent zooming / scrolling -->
   <meta name="viewport"
         content="width=device-width,
                  initial-scale=1.0,
@@ -22,11 +22,14 @@
     html, body {
       height: 100%;
       margin: 0;
+      padding: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       background: #fafafa;
       font-family: sans-serif;
+      -webkit-user-select: none;   /* prevent accidental text selection */
+      -webkit-touch-callout: none; /* prevent callout menu */
     }
     #launch-btn {
       padding: 1em 2em;
@@ -35,6 +38,7 @@
       border-radius: 0.5em;
       background: #007AFF;
       color: white;
+      cursor: pointer;
     }
     #launch-btn:active {
       opacity: 0.8;
@@ -46,8 +50,10 @@
 
   <script>
     document.getElementById('launch-btn').addEventListener('click', () => {
+      // Replace with your experiment URL
       window.location.href = 'https://studies.mrc-cbu.cam.ac.uk/publix/24ffKV3w8yu';
     });
   </script>
 </body>
 </html>
+
