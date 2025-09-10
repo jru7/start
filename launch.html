@@ -10,10 +10,7 @@
 
   <!-- Prevent zooming / scrolling -->
   <meta name="viewport"
-        content="width=device-width,
-                 initial-scale=1.0,
-                 maximum-scale=1.0,
-                 user-scalable=no">
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <!-- Home-Screen icon -->
   <link rel="apple-touch-icon" href="/path/to/icon-180.png">
@@ -22,38 +19,67 @@
     html, body {
       height: 100%;
       margin: 0;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: #000; /* helps hide any gaps around the iframe */
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .wrap {
+      position: fixed; /* no scroll bounce */
+      inset: 0;
+      display: grid;
+      place-items: center;
       background: #fafafa;
-      font-family: sans-serif;
-      -webkit-user-select: none;   /* prevent accidental text selection */
-      -webkit-touch-callout: none; /* prevent callout menu */
     }
     #launch-btn {
       padding: 1em 2em;
       font-size: 1.25rem;
-      border: none;
+      border: 0;
       border-radius: 0.5em;
       background: #007AFF;
-      color: white;
+      color: #fff;
       cursor: pointer;
     }
-    #launch-btn:active {
-      opacity: 0.8;
+    #frame {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      border: 0;
+      display: none; /* hidden until user taps */
     }
   </style>
 </head>
 <body>
-  <button id="launch-btn">Launch Experiment</button>
+  <div class="wrap" id="start">
+    <button id="launch-btn">Launch Experiment</button>
+  </div>
+
+  <!-- IMPORTANT: allow camera/mic in the iframe -->
+  <iframe
+    id="frame"
+    allow="camera; microphone; fullscreen; autoplay; clipboard-write"
+    referrerpolicy="no-referrer-when-downgrade"
+    src=""
+  ></iframe>
 
   <script>
-    document.getElementById('launch-btn').addEventListener('click', () => {
-      // Replace with your experiment URL
-      window.location.href = 'https://studies.mrc-cbu.cam.ac.uk/publix/24ffKV3w8yu';
+    const BTN  = document.getElementById('launch-btn');
+    const START = document.getElementById('start');
+    const FRAME = document.getElementById('frame');
+
+    const EXPERIMENT_URL = 'https://studies.mrc-cbu.cam.ac.uk/publix/24ffKV3w8yu';
+
+    BTN.addEventListener('click', () => {
+      // Show iframe in response to a user gesture (helps with camera permission prompts)
+      FRAME.src = EXPERIMENT_URL;
+      FRAME.style.display = 'block';
+      START.style.display = 'none';
     });
+
+    // Optional: keep the page awake (helps during long runs)
+    document.addEventListener('visibilitychange', () => {
+      // iOS PWAs sometimes dim/lock; keeping interaction helps
+    }, { passive: true });
   </script>
 </body>
 </html>
-
