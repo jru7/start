@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>One-Armed Bandit — Single Spin, Pick One</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #fff;
+      --panel: #f5f7fb;
+      --rim: #dfe3ef;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #2563eb;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      display: grid; place-items: center; padding: 24px;
+    }
+    .machine {
+      width: min(780px, 98vw);
+      background: var(--panel);
+      border: 1px solid var(--rim);
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(17,24,39,.08);
+      padding: 20px;
+    }
+    .top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; }
+    h1 { margin:0; font-size:20px; font-weight:800; letter-spacing:.2px; }
+    .status { font-weight:600; padding:6px 10px; border-radius:8px; background:#eef2ff; color:#1e40af; border:1px solid #c7d2fe; min-width:180px; text-align:center; }
+
+    .reels { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:16px; }
+    .reel {
+      aspect-ratio: 1 / 1; background:#fff; border-radius:12px; border:1px solid var(--rim);
+      position:relative; overflow:hidden; display:grid; place-items:center;
+      transition: opacity .25s ease, transform .25s ease;
+    }
+    .reel.clickable { cursor:pointer; outline: none; }
+    .reel.vanish { opacity:0; transform: scale(.92); pointer-events:none; }
+
+    /* blank placeholder before first image appears */
+    .placeholder {
+      width: 70%; aspect-ratio: 1 / 1;
+      background: repeating-linear-gradient(45deg, #f3f4f6 0, #f3f4f6 8px, #e5e7eb 8px, #e5e7eb 16px);
+      border-radius: 10px; border: 1px solid #e5e7eb;
+    }
+
+    .symbol-img { width:70%; height:auto; object-fit:contain; user-select:none; transition: transform .2s ease; }
+    /* One-off “pop” when each reel stops */
+    .symbol-img.pop { animation: pop .25s ease; }
+    @keyframes pop { from { transform: scale(0.92) } to { transform: scale(1) } }
+
+    /* Continuous bounce after user picks one */
+    .symbol-img.selected { animation: bob 0.9s ease-in-out infinite; }
+    @keyframes bob {
+      0% { transform: translateY(0) }
+      50% { transform: translateY(-30px) }
+      100% { transform: translateY(0) }
+    }
+
+    .controls { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .btn {
+      appearance:none; border:0; border-radius:10px; padding:12px 18px; font-weight:800;
+      background: var(--accent); color:#fff; cursor:pointer; box-shadow:0 6px 18px rgba(37,99,235,.3);
+    }
+    .btn[disabled]{ opacity:.6; cursor:not-allowed; background:#93c5fd; box-shadow:none; }
+    .hint { color:var(--muted); font-size:14px; margin:8px 2px 0; }
+  </style>
+</head>
+<body>
+  <main class="machine" role="region" aria-label="Slot machine">
+    <div class="top">
+      <h1>Make shells</h1>
+      <div id="status" class="status" aria-live="polite">Ready</div>
+    </div>
+
+    <section class="reels" aria-label="Reels">
+      <div class="reel" data-idx="0">
+        <div class="placeholder" aria-hidden="true"></div>
+        <img id="sym0" class="symbol-img" hidden alt="Reel 1 image">
+      </div>
+      <div class="reel" data-idx="1">
+        <div class="placeholder" aria-hidden="true"></div>
+        <img id="sym1" class="symbol-img" hidden alt="Reel 2 image">
+      </div>
+      <div class="reel" data-idx="2">
+        <div class="placeholder" aria-hidden="true"></div>
+        <img id="sym2" class="symbol-img" hidden alt="Reel 3 image">
+      </div>
+    </section>
+
+    <section class="controls">
+      <button id="spinBtn" class="btn" type="button" aria-label="Spin the reels">Let's go!</button>
+      <div class="hint" id="hint">..............</div>
+    </section>
+  </main>
+
+  <script>
+    /* ============================
+       imgages (15 total)
+    */
+    const IMG_LIBRARY = [
+    { id: 'img01', src: 'images/Shell1.png', alt: 'Object 01' },
+      { id: 'img02', src: 'images/Shell2.png', alt: 'Object 02' },
+      { id: 'img03', src: 'images/Shell3.png', alt: 'Object 03' },
+      { id: 'img04', src: 'images/Shell4.png', alt: 'Object 04' },
+      { id: 'img05', src: 'images/Shell5.png', alt: 'Object 05' },
+      { id: 'img06', src: 'images/Shell6.png', alt: 'Object 06' },
+      { id: 'img07', src: 'images/Shell7.png', alt: 'Object 07' },
+      { id: 'img08', src: 'images/Shell8.png', alt: 'Object 08' },
+      { id: 'img09', src: 'images/Shell9.png', alt: 'Object 09' },
+      { id: 'img10', src: 'images/Shell10.png', alt: 'Object 10' },
+      { id: 'img11', src: 'images/Shell11.png', alt: 'Object 11' },
+      { id: 'img12', src: 'images/Shell12.png', alt: 'Object 12' },
+      { id: 'img13', src: 'images/Shell13.png', alt: 'Object 13' },
+      { id: 'img14', src: 'images/Shell14.png', alt: 'Object 14' },
+      { id: 'img15', src: 'images/Shell15.png', alt: 'Object 15' },
+    ];
+    const IMG_BY_ID = Object.fromEntries(IMG_LIBRARY.map(x => [x.id, x]));
+
+    /* ============================
+       5 images per reel 
+    ============================ */
+    const REEL_IDS = [
+      ['img01', 'img02', 'img03', 'img04', 'img05'], // Reel 1 (5 images)
+      ['img06', 'img07', 'img08', 'img09', 'img10'], // Reel 2 (5 images)
+      ['img11', 'img12', 'img13', 'img14', 'img15']  // Reel 3 (5 images)
+    ];
+
+    // Preload used images to avoid flicker
+    (function preload() { new Set(REEL_IDS.flat()).forEach(id => { const im = new Image(); im.src = IMG_BY_ID[id]?.src; }); })();
+
+    // --- Elements ---
+    const reels = [...document.querySelectorAll('.reel')];
+    const imgs  = [ 'sym0','sym1','sym2' ].map(id => document.getElementById(id));
+    const btn   = document.getElementById('spinBtn');
+    const statusEl = document.getElementById('status');
+    const hintEl = document.getElementById('hint');
+
+    // --- State ---
+    let spinning = false;
+    let hasSpun = false;            // only allow one spin
+    let selectionOpen = false;      // click-to-choose enabled after spin completes
+    let chosenIndex = null;
+
+    const tickMs = 80;
+    const stopDurations = [1000, 1500, 2000];
+
+    function randChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    function setReelImage(imgEl, id) {
+      const meta = IMG_BY_ID[id]; if (!meta) return;
+      imgEl.hidden = false; // reveal image (box was blank initially)
+      imgEl.src = meta.src;
+      imgEl.alt = meta.alt || id;
+    }
+
+    function spinReel(imgEl, reelIndex, finalId) {
+      const pool = REEL_IDS[reelIndex];
+      return new Promise(resolve => {
+        // show something immediately while spinning
+        let i = Math.floor(Math.random() * pool.length);
+        setReelImage(imgEl, pool[i]);
+
+        const timer = setInterval(() => {
+          i = (i + 1) % pool.length;
+          setReelImage(imgEl, pool[i]);
+        }, tickMs);
+
+        setTimeout(() => {
+          clearInterval(timer);
+          setReelImage(imgEl, finalId);
+          // one-off pop
+          imgEl.classList.remove('pop'); void imgEl.offsetWidth; imgEl.classList.add('pop');
+          resolve(finalId);
+        }, stopDurations[reelIndex]);
+      });
+    }
+
+    async function spinAll() {
+      if (spinning || hasSpun) return; // single spin only
+      spinning = true;
+      btn.disabled = true;
+      statusEl.textContent = 'Making…';
+      hintEl.textContent = '[.........]';
+
+      const finals = [ randChoice(REEL_IDS[0]), randChoice(REEL_IDS[1]), randChoice(REEL_IDS[2]) ];
+      await Promise.all([
+        spinReel(imgs[0], 0, finals[0]),
+        spinReel(imgs[1], 1, finals[1]),
+        spinReel(imgs[2], 2, finals[2]),
+      ]);
+
+      // Enable selection
+      selectionOpen = true;
+      hasSpun = true;
+      spinning = false;
+      statusEl.textContent = 'Pick one shell';
+      reels.forEach(r => r.classList.add('clickable'));
+      hintEl.textContent = '[................]';
+      btn.textContent = 'done';
+    }
+
+    // Handle choosing one reel after spin
+    function handleChoose(e) {
+  if (!selectionOpen || chosenIndex !== null) return;
+
+  const el  = e.currentTarget;
+  const idx = parseInt(el.dataset.idx, 10);
+
+  chosenIndex   = idx;
+  selectionOpen = false;
+
+  // stop further picks
+  reels.forEach(reel => reel.classList.remove('clickable'));
+
+  // make only the chosen image bounce continuously
+  imgs[idx].classList.add('selected');
+
+  statusEl.textContent = `You picked...`;
+  hintEl.textContent   = 'to make shells again need to reload page.';
+}
+
+
+    // Wire up
+    btn.addEventListener('click', () => {
+    document.querySelectorAll('.placeholder').forEach(el => el.remove());
+    spinAll();
+  }, { once: true }); // allow only one spin
+
+    reels.forEach(r => r.addEventListener('click', handleChoose));
+
+    // Start with BLANK boxes: <img hidden> + visible .placeholder already achieve this.
+  </script>
+</body>
+</html>
